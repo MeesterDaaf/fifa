@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import type { Match } from "@prisma/client";
 import { formatDateShort, getFlag } from "@/lib/utils";
 import AdminSyncButton from "@/components/AdminSyncButton";
 import AdminMatchForm from "@/components/AdminMatchForm";
@@ -66,7 +67,7 @@ export default async function AdminPage() {
           {matches.length === 0 && (
             <p className="text-gray-500 text-sm">Nog geen wedstrijden. Synchroniseer eerst.</p>
           )}
-          {matches.map((match) => (
+          {matches.map((match: Match & { _count: { predictions: number } }) => (
             <details key={match.id} className="bg-white rounded-xl shadow-sm border border-gray-100">
               <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 rounded-xl">
                 <div className="flex-1 flex items-center gap-2">
