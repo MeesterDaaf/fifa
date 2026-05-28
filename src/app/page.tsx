@@ -1,65 +1,172 @@
-import Image from "next/image";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { getLeaderboard } from "@/lib/scoring";
+import Link from "next/link";
+import { formatDateShort, getFlag } from "@/lib/utils";
 
-export default function Home() {
+export default async function HomePage() {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login");
+
+  const now = new Date();
+
+  const upcoming = await prisma.match.findMany({
+    where: { scheduledAt: { gte: now }, status: "SCHEDULED" },
+    orderBy: { scheduledAt: "asc" },
+    take: 5,
+  });
+
+  const recent = await prisma.match.findMany({
+    where: { status: "FINISHED" },
+    orderBy: { scheduledAt: "desc" },
+    take: 5,
+  });
+
+  const myPredIds = new Set(
+    (
+      await prisma.prediction.findMany({
+        where: {
+          userId: session.user.id,
+          matchId: { in: upcoming.map((m) => m.id) },
+        },
+        select: { matchId: true },
+      })
+    ).map((p) => p.matchId)
+  );
+
+  const leaderboard = (await getLeaderboard()).slice(0, 5);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+      {/* Hero */}
+      <div className="bg-gradient-to-r from-green-700 to-green-600 rounded-2xl p-6 text-white">
+        <h1 className="text-2xl font-bold">Welkom, {session.user.name}! 👋</h1>
+        <p className="text-green-200 mt-1">FIFA Wereldkampioenschap 2026</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/voorspellingen"
+            className="bg-white text-green-700 font-semibold px-5 py-2.5 rounded-xl hover:bg-green-50 transition-colors text-sm"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            ⚽ Maak voorspelling
+          </Link>
+          <Link
+            href="/toernooi"
+            className="bg-green-600 border border-white/30 text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-green-500 transition-colors text-sm"
           >
-            Documentation
-          </a>
+            🏆 Toernooi voorspelling
+          </Link>
         </div>
-      </main>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Aankomende wedstrijden */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 mb-3">📅 Aankomende wedstrijden</h2>
+          {upcoming.length === 0 ? (
+            <p className="text-gray-500 text-sm bg-white rounded-xl p-4 shadow-sm">
+              Geen geplande wedstrijden. Sync eerst wedstrijden via admin.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {upcoming.map((match) => (
+                <Link
+                  key={match.id}
+                  href={`/voorspellingen/${match.id}`}
+                  className="block bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-green-300 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-sm font-semibold text-gray-800">
+                        {getFlag(match.homeTeamCode)} {match.homeTeamCode}
+                      </span>
+                      <span className="text-gray-400 text-xs font-bold">vs</span>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {match.awayTeamCode} {getFlag(match.awayTeamCode)}
+                      </span>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs text-gray-500">{formatDateShort(match.scheduledAt)}</div>
+                      {myPredIds.has(match.id) ? (
+                        <span className="text-xs text-green-600 font-medium">✅ Voorspeld</span>
+                      ) : (
+                        <span className="text-xs text-orange-500 font-medium">⏳ Voorspel nog</span>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+              <Link href="/voorspellingen" className="block text-center text-sm text-green-600 hover:underline py-1">
+                Alle wedstrijden →
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {/* Ranglijst top 5 */}
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 mb-3">🏆 Top 5 Ranglijst</h2>
+          {leaderboard.length === 0 ? (
+            <p className="text-gray-500 text-sm bg-white rounded-xl p-4 shadow-sm">Nog geen punten gescoord</p>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {leaderboard.map((entry, i) => (
+                <div
+                  key={entry.id}
+                  className={`flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0 ${
+                    entry.id === session.user.id ? "bg-green-50" : ""
+                  }`}
+                >
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                    i === 0 ? "bg-yellow-400 text-yellow-900" :
+                    i === 1 ? "bg-gray-300 text-gray-700" :
+                    i === 2 ? "bg-orange-300 text-orange-900" :
+                    "bg-gray-100 text-gray-600"
+                  }`}>
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 font-medium text-sm text-gray-800 truncate">
+                    {entry.name}
+                    {entry.id === session.user.id && (
+                      <span className="text-green-600 text-xs ml-1">(jij)</span>
+                    )}
+                  </span>
+                  <span className="font-bold text-green-700 flex-shrink-0">{entry.totalPoints}pt</span>
+                </div>
+              ))}
+              <Link href="/ranglijst" className="block text-center text-sm text-green-600 hover:underline py-3">
+                Volledige ranglijst →
+              </Link>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* Recente uitslagen */}
+      {recent.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold text-gray-800 mb-3">🎯 Recente uitslagen</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recent.map((match) => (
+              <div key={match.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div className="text-xs text-gray-400 mb-2">{formatDateShort(match.scheduledAt)}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    {getFlag(match.homeTeamCode)} {match.homeTeamCode}
+                  </span>
+                  <span className="text-lg font-bold text-gray-800 bg-gray-100 px-3 py-1 rounded-lg">
+                    {match.homeScore ?? "?"} - {match.awayScore ?? "?"}
+                  </span>
+                  <span className="text-sm font-medium text-gray-700">
+                    {match.awayTeamCode} {getFlag(match.awayTeamCode)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
