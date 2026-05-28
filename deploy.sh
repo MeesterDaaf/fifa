@@ -6,14 +6,20 @@ set -e
 
 echo "🚀 FIFA 2026 Pool deployen..."
 
+# Lokale prisma binary (vermijdt conflicten met globaal geïnstalleerde versies)
+PRISMA="./node_modules/.bin/prisma"
+
 # 1. Laatste code ophalen
 git pull origin main
 
-# 2. Dependencies installeren (roept automatisch prisma generate via postinstall)
-npm ci
+# 2. Dependencies installeren zonder postinstall (vermijdt conflict met globale Prisma 7)
+npm ci --ignore-scripts
+
+# Prisma client genereren met lokale versie
+./node_modules/.bin/prisma generate
 
 # 3. Database schema bijwerken (SQLite)
-npx prisma db push
+$PRISMA db push
 
 # 4. App bouwen
 npm run build

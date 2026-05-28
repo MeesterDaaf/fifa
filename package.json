@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "postinstall": "prisma generate",
+    "postinstall": "./node_modules/.bin/prisma generate",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts",
     "db:push": "prisma db push",
