@@ -9,11 +9,10 @@ echo "🚀 FIFA 2026 Pool deployen..."
 # 1. Laatste code ophalen
 git pull origin main
 
-# 2. Dependencies installeren
+# 2. Dependencies installeren (roept automatisch prisma generate via postinstall)
 npm ci
 
-# 3. Prisma client genereren + database migreren (SQLite)
-npx prisma generate
+# 3. Database schema bijwerken (SQLite)
 npx prisma db push
 
 # 4. App bouwen
